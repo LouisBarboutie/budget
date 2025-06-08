@@ -1,0 +1,16 @@
+site_name: PyBudget
+
+nav:
+  - Home: index.md
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+
+plugins:
+- mkdocstrings:
+    default_handler: python
+    handlers:
+      python:
+        paths: [src]
