@@ -1,0 +1,15 @@
+category_colors = {
+    "Transaction exclue": "grey",
+    "Transports": "blue",
+    "Logement - maison": "red",
+    "Juridique et administratif": "purple",
+    "Banque et assurances": "blue",
+    "Education et famille": "red",
+    "Alimentation": "red",
+    "Sante": "orange",
+    "Shopping et services": "orange",
+    "Revenus et rentrees d'argent": "purple",
+    "Loisirs et vacances": "lightblue",
+    "A categoriser - rentree d'argent": "grey",
+    "A categoriser - sortie d'argent": "grey",
+}
