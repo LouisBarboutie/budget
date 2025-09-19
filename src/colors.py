@@ -1,4 +1,4 @@
-category_colors = {
+CATEGORY_COLORS = {
     "Transaction exclue": "grey",
     "Transports": "blue",
     "Logement - maison": "red",

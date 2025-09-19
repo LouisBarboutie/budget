@@ -1,14 +1,14 @@
 from datetime import datetime, timedelta
 import dateutil
+from typing import Optional
 
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdt
 from prettytable import PrettyTable
 
 from account import Account
-from colors import category_colors
+from colors import CATEGORY_COLORS
 
 
 def display_monthly_averages(account: Account, start: datetime, stop: datetime) -> None:
@@ -26,21 +26,67 @@ def display_monthly_averages(account: Account, start: datetime, stop: datetime) 
         if category == "Transaction exclue":
             continue
         table.add_row([category, average])
-
     table.sortby = "Value"
     table.sort_key(lambda x: -x)
+
+    print(table)
+
+    table = PrettyTable(["", "Total"], float_format=".2")
+    table.align["Total"] = "r"
+    expenses = sum([average for average in averages.values() if average < 0])
+    revenue = sum([average for average in averages.values() if average > 0])
+    balance = revenue + expenses
+    table.add_rows(
+        [
+            ["Total expenses", expenses],
+            ["Total revenue", revenue],
+            ["Balance", balance],
+        ],
+        divider=True,
+    )
+
     print(table)
 
     return
 
 
-def operations(account: Account) -> plt.Figure:
+def expenses(
+    account: Account, start: str | datetime, stop: Optional[str | datetime]
+) -> plt.Figure:
+    """TODO"""
 
-    dates = account.dataframe["Date"].to_numpy()
-    operations = account.dataframe["Operation"].to_numpy()
+    dates, operations = account.expenses(start, stop)
 
     fig, ax = plt.subplots()
-    ax.plot(dates, operations)
+    ax.plot(dates, np.abs(operations))
+
+    fmt = "%d %B %Y"
+    fig.suptitle(
+        f"Expenses for the dates of {start.strftime(fmt)} to {stop.strftime(fmt)}"
+    )
+    ax.set_ylabel("Expenses [€]")
+    ax.xaxis.set_major_formatter(mdt.DateFormatter("%b %Y"))
+    ax.xaxis.set_major_locator(mdt.MonthLocator())
+    ax.tick_params(axis="x", labelrotation=45)
+
+    return fig
+
+
+def income(
+    account: Account, start: str | datetime, stop: Optional[str | datetime]
+) -> plt.Figure:
+    """TODO"""
+
+    dates, operations = account.revenue(start, stop)
+
+    fig, ax = plt.subplots()
+    ax.plot(dates, np.abs(operations))
+
+    fmt = "%d %B %Y"
+    fig.suptitle(
+        f"Expenses for the dates of {start.strftime(fmt)} to {stop.strftime(fmt)}"
+    )
+    ax.set_ylabel("Expenses [€]")
     ax.xaxis.set_major_formatter(mdt.DateFormatter("%b %Y"))
     ax.xaxis.set_major_locator(mdt.MonthLocator())
     ax.tick_params(axis="x", labelrotation=45)
@@ -67,7 +113,7 @@ def pie_monthly(
     mask = sums / total > min_contribution
     debit = sums[mask]
     labels = grouped_sums.keys().to_numpy()[mask]
-    colors = [category_colors[category] for category in labels]
+    colors = [CATEGORY_COLORS[category] for category in labels]
 
     if mask.size > 0:
         debit = np.append(debit, total - np.sum(debit))
@@ -87,10 +133,8 @@ def pie_monthly(
         debit,
         autopct="%1.1f%%",
         pctdistance=0.7,
-        # explode=explode,
         radius=0.75,
         labels=labels,
-        # rotatelabels=True,
         colors=colors,
         wedgeprops={"linewidth": 2, "edgecolor": "white", "width": 0.5},
     )
@@ -98,67 +142,39 @@ def pie_monthly(
     return fig
 
 
-def cumulative_monthly(account: Account, month: datetime) -> plt.Figure:
-    expenses, dates = account.get_cumulative_monthly(month)
-    fig, ax = plt.subplots()
-    ax.scatter(dates, expenses)
-    ax.xaxis.set_major_formatter(mdt.DateFormatter("%d %b %Y"))
-    ax.xaxis.set_major_locator(mdt.DayLocator())
-    ax.tick_params(axis="x", labelrotation=45)
-
-    return fig
-
-
 def cumulative_histogram(
-    account: Account, start_month: str, end_month: str, include_end: bool = False
+    account: Account,
+    start: str | datetime,
+    stop: Optional[str | datetime] = None,
 ) -> plt.Figure:
 
-    start_date = dateutil.parser.parse(start_month)
-    end_date = dateutil.parser.parse(end_month)
+    if isinstance(start, str):
+        start = dateutil.parser.parse(start)
+    start = start.replace(day=1)
 
-    # reset day to first of month because parser gives random number if no
-    # day is included in the input str
-    start_date = start_date.replace(day=1)
-    end_date = end_date.replace(day=1)
+    if stop is None:
+        stop = start.replace(month=start.month + 1)
+    if isinstance(stop, str):
+        stop = dateutil.parser.parse(stop)
+    stop = stop.replace(day=1)
 
-    if include_end:
-        next_month = (end_date.month + 1) % 12
-        next_year = end_date.year + (end_date.month + 1) // 12
-        end_date = end_date.replace(month=next_month, year=next_year)
+    expenses, dates = account.get_cumulative_monthly(start, stop)
 
-    filtered_dataframe = account.dataframe.loc[
-        (account.dataframe["Date"] >= start_date)
-        & (account.dataframe["Date"] < end_date)
-        & (account.dataframe["Operation"] < 0)
-        & (account.dataframe["Category"] != "Transaction exclue")
-    ]
-
-    date_index = pd.PeriodIndex(filtered_dataframe["Date"], freq="M")
-    grouped_dataframe = filtered_dataframe.groupby(date_index)
-    expenses = grouped_dataframe["Operation"].cumsum().to_numpy()
-    dates = filtered_dataframe["Date"].to_numpy()
+    widths = np.zeros_like(dates)
+    widths[:-1] = dates[1:] - dates[:-1]
+    widths[-1] = np.datetime64(stop) - dates[-1]
 
     fig, ax = plt.subplots()
-    ax.plot(dates, expenses)
+    ax.bar(dates, np.abs(expenses), widths, align="edge")
+
+    FORMAT = "%B %Y"
+    fig.suptitle(
+        f"Cumulative expenses for the period of {start.strftime(FORMAT)} to {stop.strftime(FORMAT)}"
+    )
+    ax.set_ylabel("Cumulative expenses (€)")
     ax.xaxis.set_major_formatter(mdt.DateFormatter("%b %Y"))
     ax.xaxis.set_major_locator(mdt.MonthLocator())
     ax.xaxis.set_minor_locator(mdt.DayLocator())
     ax.tick_params(axis="x", labelrotation=45)
-
-    start = start_date.strftime("%B %Y")
-    end = end_date.strftime("%B %Y")
-    fig.suptitle(f"Cumulative expenses for the period of {start} to {end}")
-    ax.set_ylabel("Cumulative expenses (€)")
-
-    fig2, ax = plt.subplots()
-    ax.xaxis.set_major_formatter(mdt.DateFormatter("%b %Y"))
-    ax.xaxis.set_major_locator(mdt.MonthLocator())
-    ax.tick_params(axis="x", labelrotation=45)
-
-    widths = np.zeros_like(dates)
-    widths[:-1] = dates[1:] - dates[:-1]
-    widths[-1] = np.datetime64(end_date) - dates[-1]
-
-    ax.bar(dates, np.abs(expenses), widths, align="edge")
 
     return fig
