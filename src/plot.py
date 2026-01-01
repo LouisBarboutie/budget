@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdt
 from prettytable import PrettyTable
 
-from account import Account
-from colors import CATEGORY_COLORS
+from .account import Account
+from .colors import CATEGORY_COLORS
 
 
 def display_monthly_averages(account: Account, start: datetime, stop: datetime) -> None:
@@ -99,13 +99,15 @@ def pie_monthly(
 ) -> plt.Figure:
 
     start = month
-    stop = datetime(month.year, month.month + 1, 1)
+    stop = start + dateutil.relativedelta.relativedelta(months=1)
     sub_dataframe = account.dataframe.loc[
         (account.dataframe["Date"] >= start) & (account.dataframe["Date"] < stop)
     ]
     sub_dataframe = sub_dataframe.loc[sub_dataframe["Operation"] < 0]
     grouped_sums = sub_dataframe.groupby("Category")["Operation"].sum()
-    grouped_sums = grouped_sums.drop("Transaction exclue").sort_values()
+    grouped_sums = grouped_sums.drop(
+        "Transaction exclue", errors="ignore"
+    ).sort_values()
 
     sums = np.abs(grouped_sums.values)
     total = np.sum(sums)

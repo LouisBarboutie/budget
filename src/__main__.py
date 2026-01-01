@@ -22,7 +22,7 @@ MONTH_FUNCTIONS = {
     "pie": plot.pie_monthly,
 }
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(add_help=True)
 parser.add_argument(
     "-file", "-f", action="append", required=True, help="File to read the data from"
 )
